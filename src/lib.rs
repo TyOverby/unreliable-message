@@ -4,15 +4,16 @@
 use std::collections::{VecMap, HashMap};
 
 #[derive(Clone, Copy, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct MsgId(u64);
+pub struct MsgId(u64);
 
 #[derive(Clone, Copy, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct PieceNum(u16, u16);
+pub struct PieceNum(u16, u16);
 
 #[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
-struct MsgChunk(MsgId, PieceNum, Vec<u8>);
+pub struct MsgChunk(MsgId, PieceNum, Vec<u8>);
 
-struct CompleteMessage(MsgId, Vec<u8>);
+#[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
+pub struct CompleteMessage(MsgId, Vec<u8>);
 
 struct MsgStage {
     this_id: MsgId,
@@ -20,7 +21,7 @@ struct MsgStage {
     pieces: VecMap<MsgChunk>
 }
 
-struct MsgQueue {
+pub struct MsgQueue {
     last_released: Option<MsgId>,
     stages: HashMap<MsgId, MsgStage>,
 }
@@ -60,7 +61,7 @@ impl MsgQueue {
             return Some(CompleteMessage(id, chunk.2));
         }
 
-        // If we already have a stage with the same message id, add it
+        // If we are building a stage with the same message id, add it
         // to the stage.
         if self.stages.contains_key(&id) {
             let ready = {
@@ -125,4 +126,115 @@ impl MsgStage {
 
         CompleteMessage(self.this_id, v)
     }
+}
+
+
+// Stage tests
+
+#[test] fn is_ready_single_complete() {
+    let comp_chunk = MsgChunk(MsgId(0), PieceNum(1, 1), vec![0]);
+    let stage = MsgStage::new(comp_chunk);
+    assert!(stage.is_ready());
+    assert!(stage.merge() == CompleteMessage(MsgId(0), vec![0]));
+}
+
+#[test] fn is_ready_single_incomplete() {
+    let incomp_chunk = MsgChunk(MsgId(0), PieceNum(1, 2), vec![0]);
+    let stage = MsgStage::new(incomp_chunk);
+    assert!(!stage.is_ready());
+}
+
+#[test] fn is_ready_double_complete() {
+    let c1 = MsgChunk(MsgId(0), PieceNum(1, 2), vec![0]);
+    let c2 = MsgChunk(MsgId(0), PieceNum(2, 2), vec![1]);
+
+    let mut stage = MsgStage::new(c1.clone());
+    stage.add_chunk(c2.clone());
+    assert!(stage.is_ready());
+    assert!(stage.merge() == CompleteMessage(MsgId(0), vec![0, 1]));
+
+    // Now in the opposite order
+
+    let mut stage = MsgStage::new(c2.clone());
+    stage.add_chunk(c1.clone());
+    assert!(stage.is_ready());
+    assert!(stage.merge() == CompleteMessage(MsgId(0), vec![0, 1]));
+}
+
+#[test] fn is_ready_double_same() {
+    let c1 = MsgChunk(MsgId(0), PieceNum(1, 2), vec![0]);
+
+    let mut stage = MsgStage::new(c1.clone());
+    stage.add_chunk(c1);
+    assert!(!stage.is_ready());
+}
+
+// Queue tests
+
+#[test] fn queue_single() {
+    let mut queue = MsgQueue::new();
+    let c1 = MsgChunk(MsgId(1), PieceNum(1, 1), vec![0]);
+
+    let res = queue.insert_chunk(c1.clone());
+
+    assert!(res.is_some());
+    assert!(res.unwrap() == CompleteMessage(MsgId(1), vec![0]));
+    assert!(queue.last_released == Some(MsgId(1)));
+
+    // try to requeue the message.  It shouldn't go through this time.
+    let res = queue.insert_chunk(c1);
+    assert!(res.is_none());
+}
+
+#[test] fn queue_double() {
+    let mut queue = MsgQueue::new();
+    let c1 = MsgChunk(MsgId(1), PieceNum(1, 2), vec![0]);
+    let c2 = MsgChunk(MsgId(1), PieceNum(2, 2), vec![1]);
+
+    let res = queue.insert_chunk(c1.clone());
+    assert!(res.is_none());
+    let res = queue.insert_chunk(c2.clone());
+    assert!(res.is_some());
+    assert!(res.unwrap() == CompleteMessage(MsgId(1), vec![0, 1]));
+    assert!(queue.last_released == Some(MsgId(1)));
+
+    assert!(queue.insert_chunk(c1).is_none());
+    assert!(queue.insert_chunk(c2).is_none());
+}
+
+#[test] fn out_of_order() {
+    let mut queue = MsgQueue::new();
+    let c1 = MsgChunk(MsgId(1), PieceNum(1, 1), vec![0]);
+    let c2 = MsgChunk(MsgId(2), PieceNum(1, 1), vec![1]);
+
+    assert!(queue.insert_chunk(c2.clone()).is_some());
+    assert!(queue.insert_chunk(c1).is_none());
+    assert!(queue.insert_chunk(c2).is_none());
+}
+
+#[test] fn odd_orders() {
+    let a1 = MsgChunk(MsgId(1), PieceNum(1, 2), vec![0]);
+    let a2 = MsgChunk(MsgId(1), PieceNum(2, 2), vec![1]);
+
+    let b1 = MsgChunk(MsgId(2), PieceNum(1, 2), vec![2]);
+    let b2 = MsgChunk(MsgId(2), PieceNum(2, 2), vec![3]);
+
+    let mut queue = MsgQueue::new();
+    assert!(queue.insert_chunk(a1.clone()).is_none());
+    assert!(queue.insert_chunk(b1.clone()).is_none());
+    assert!(queue.insert_chunk(a2.clone()).is_some());
+    assert!(queue.insert_chunk(b2.clone()).is_some());
+
+
+    let mut queue = MsgQueue::new();
+    assert!(queue.insert_chunk(a1.clone()).is_none());
+    assert!(queue.insert_chunk(b1.clone()).is_none());
+    assert!(queue.insert_chunk(b2.clone()).is_some());
+    assert!(queue.insert_chunk(a2.clone()).is_none());
+
+
+    let mut queue = MsgQueue::new();
+    assert!(queue.insert_chunk(b1.clone()).is_none());
+    assert!(queue.insert_chunk(b2.clone()).is_some());
+    assert!(queue.insert_chunk(a2.clone()).is_none());
 }
