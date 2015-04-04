@@ -8,6 +8,7 @@ use super::msgqueue::*;
 use bincode;
 
 static MAX_MSG: u16 = ::std::u16::MAX;
+static MSG_PADDING: u16 = 32;
 
 struct Sender {
     out_queue: VecDeque<(MsgChunk, Rc<AddrsContainer>)>,
@@ -43,11 +44,11 @@ impl Sender {
         self.last_id += 1;
         let id = self.last_id;
         let addrs = Rc::new(try!(AddrsContainer::from_to_sock(addrs)));
-        let num_chunks = message.len() / (self.msg_length as usize);
+        let num_chunks = message.len() / ((self.msg_length - MSG_PADDING) as usize);
 
         for _ in 0 .. self.replication {
             let mut chunk_count = 0;
-            for chunk in message[..].chunks(self.msg_length as usize) {
+            for chunk in message[..].chunks((self.msg_length - MSG_PADDING) as usize) {
                 let mut v = Vec::with_capacity(chunk.len());
                 v.push_all(chunk);
                 let chunk = MsgChunk(
@@ -60,11 +61,11 @@ impl Sender {
         Ok(())
     }
 
-    fn send_one(&mut self) -> bincode::EncodingResult<()> {
+    fn send_one(&mut self) -> IoResult<()> {
         let bound = bincode::SizeLimit::Bounded(MAX_MSG as u64);
         if let Some((next, addrs)) = self.out_queue.pop_front() {
-            let bytes = try!(bincode::encode(&next, bound));
-            self.socket.send_to(&bytes[..], &*addrs);
+            let bytes = bincode::encode(&next, bound).unwrap();
+            try!(self.socket.send_to(&bytes[..], &*addrs));
         }
 
         Ok(())
