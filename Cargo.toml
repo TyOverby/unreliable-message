@@ -2,3 +2,7 @@
 name = "unreliable"
 version = "0.0.1"
 authors = ["Ty Overby <ty@pre-alpha.com>"]
+
+[dependencies]
+bincode = "*"
+rustc-serialize = "*"
