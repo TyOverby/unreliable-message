@@ -1,19 +1,19 @@
 use std::collections::{VecMap, HashMap};
 
 #[derive(RustcEncodable, RustcDecodable, Clone, Copy)]
-#[derive(Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Hash, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct MsgId(pub u64);
 
 #[derive(RustcEncodable, RustcDecodable, Clone, Copy)]
-#[derive(Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Hash, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct PieceNum(pub u16, pub u16);
 
 #[derive(RustcEncodable, RustcDecodable, Clone)]
-#[derive(Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Hash, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct MsgChunk(pub MsgId, pub PieceNum, pub Vec<u8>);
 
 #[derive(RustcEncodable, RustcDecodable, Clone)]
-#[derive(Hash, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Hash, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct CompleteMessage(pub MsgId, pub Vec<u8>);
 
 struct MsgStage {
