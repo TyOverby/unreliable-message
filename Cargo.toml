@@ -1,7 +1,13 @@
 [package]
 name = "unreliable-message"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Ty Overby <ty@pre-alpha.com>"]
+license = "MIT"
+description = "An implementation of unreliable message sending over UDP"
+
+[lib]
+path = "./src/lib.rs"
+name = "unreliable_message"
 
 [dependencies]
 bincode = "*"

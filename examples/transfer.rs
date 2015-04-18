@@ -1,5 +1,5 @@
 #![feature(ip_addr)]
-extern crate unreliable;
+extern crate unreliable_message;
 
 use std::net::{UdpSocket, SocketAddr, IpAddr, Ipv4Addr};
 
@@ -19,8 +19,8 @@ const MSG_SIZE:u16 = 50;
 
 fn main() {
     use std::thread;
-    use unreliable::{Sender, Receiver};
-    use unreliable::msgqueue::CompleteMessage;
+    use unreliable_message::{Sender, Receiver};
+    use unreliable_message::msgqueue::CompleteMessage;
 
     let (ours, theirs) = get_sockets();
     let udp_in = UdpSocket::bind(ours).unwrap();
