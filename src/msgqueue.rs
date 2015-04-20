@@ -19,34 +19,63 @@ pub struct CompleteMessage(pub MsgId, pub Vec<u8>);
 struct MsgStage {
     this_id: MsgId,
     total_pieces: u16,
-    pieces: VecMap<MsgChunk>
+    pieces: VecMap<MsgChunk>,
+    size: usize
 }
 
 pub struct MsgQueue {
     last_released: Option<MsgId>,
     stages: HashMap<MsgId, MsgStage>,
+    max_size: Option<usize>,
+    cur_size: usize
 }
 
 impl MsgQueue {
-    pub fn new() -> MsgQueue {
+    pub fn new(max_size: Option<usize>) -> MsgQueue {
         MsgQueue {
             last_released: None,
-            stages: HashMap::new()
+            stages: HashMap::new(),
+            max_size: max_size,
+            cur_size: 0,
         }
     }
 
-    fn mark_published(&mut self, id: MsgId) {
-        self.last_released = Some(id);
-        let kept: Vec<_> = self.stages.keys().cloned().collect();
-        for open in kept {
-            if id > open {
-                self.stages.remove(&open);
+    // Sets an id as being published, in turn removing all
+    // earlier messages.
+    fn mark_published(&mut self, just_published: MsgId) {
+        self.last_released = Some(just_published);
+        let keys: Vec<_> = self.stages.keys().cloned().collect();
+        for open in keys {
+            if just_published > open {
+                if let Some(stage) = self.stages.remove(&open) {
+                    self.cur_size -= stage.size;
+                }
+            }
+        }
+    }
+
+    // If we are over capacity, this function will remove messages from
+    // the beginning of the queue until we are no longer above capacity.
+    fn prune(&mut self) {
+        if self.max_size.is_none() { return; }
+        let max_size = self.max_size.unwrap();
+        let mut open: Vec<_> = self.stages.keys().cloned().collect();
+        (&mut open[..]).sort_by(|&MsgId(a), &MsgId(b)| b.cmp(&a));
+
+        while self.cur_size > max_size {
+            if let Some(id) = open.pop() {
+                if let Some(stage) = self.stages.remove(&id) {
+                    self.cur_size -= stage.size;
+                }
+            } else {
+                break;
             }
         }
     }
 
     pub fn insert_chunk(&mut self, chunk: MsgChunk) -> Option<CompleteMessage> {
         let id = chunk.0;
+        self.prune();
 
         // If the last published message was released before this chunk,
         // don't do anything and ignore it.
@@ -62,17 +91,18 @@ impl MsgQueue {
             return Some(CompleteMessage(id, chunk.2));
         }
 
-        // If we are building a stage with the same message id, add it
+        // If we are building a stage with the an existing message id, add it
         // to the stage.
         if self.stages.contains_key(&id) {
             let ready = {
                 let stage = self.stages.get_mut(&id).unwrap();
-                stage.add_chunk(chunk);
+                self.cur_size += stage.add_chunk(chunk);
                 stage.is_ready()
             };
 
             if ready {
                 let mut stage = self.stages.remove(&id).unwrap();
+                self.cur_size -= stage.size;
                 self.mark_published(id);
                 return Some(stage.merge());
             } else {
@@ -94,7 +124,8 @@ impl MsgStage {
         let mut stage = MsgStage {
             this_id: starter.0,
             total_pieces: out_of,
-            pieces: VecMap::with_capacity(out_of as usize)
+            pieces: VecMap::with_capacity(out_of as usize),
+            size: 0
         };
 
         stage.add_chunk(starter);
@@ -105,11 +136,14 @@ impl MsgStage {
         self.total_pieces as usize == self.pieces.len()
     }
 
-    fn add_chunk(&mut self, chunk: MsgChunk) {
+    fn add_chunk(&mut self, chunk: MsgChunk) -> usize {
         let PieceNum(this, _) = chunk.1;
         if !self.pieces.contains_key(&(this as usize)) {
+            let size = chunk.2.len();
+            self.size += size;
             self.pieces.insert(this as usize, chunk);
-        }
+            size
+        } else { 0 }
     }
 
     fn merge(mut self) -> CompleteMessage {

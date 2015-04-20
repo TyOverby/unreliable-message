@@ -23,7 +23,8 @@ pub struct Sender {
 pub struct Receiver {
     socket: UdpSocket,
     queue: HashMap<SocketAddr, MsgQueue>,
-    pub datagram_length: u16
+    pub datagram_length: u16,
+    max_connection_size: Option<usize>
 }
 
 #[derive(Debug, Clone)]
@@ -53,11 +54,13 @@ impl Receiver {
     ///
     /// `datagram_length` is the max-size of the UDP packet that you expect to
     /// receive.
-    pub fn from_socket(socket: UdpSocket, datagram_length: u16) -> Receiver {
+    pub fn from_socket(socket: UdpSocket, datagram_length: u16, max_connection_size: Option<usize>) -> Receiver {
         Receiver {
             socket: socket,
             datagram_length: datagram_length,
-            queue: HashMap::new()
+            queue: HashMap::new(),
+            max_connection_size: max_connection_size
+
         }
     }
 
@@ -70,7 +73,9 @@ impl Receiver {
             let data = &buf[0 .. amnt];
             let chunk: MsgChunk = try!(bincode::decode(data));
 
-            let q = self.queue.entry(from.clone()).or_insert_with(|| MsgQueue::new());
+            let max_size = self.max_connection_size.clone();
+            let q = self.queue.entry(from.clone())
+                              .or_insert_with(|| MsgQueue::new(max_size));
             if let Some(completed) = q.insert_chunk(chunk) {
                 return Ok((from, completed));
             }
