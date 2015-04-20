@@ -9,7 +9,7 @@ use bincode::{EncodingError, DecodingError};
 pub use network::{Sender, Receiver};
 
 pub mod msgqueue;
-mod network;
+pub mod network;
 
 pub type UnrResult<T> = Result<T, UnrError>;
 

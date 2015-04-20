@@ -2,7 +2,6 @@ use std::sync::mpsc;
 use std::collections::{VecDeque, HashMap};
 use std::collections::hash_map::Entry;
 use std::net::{UdpSocket, ToSocketAddrs, SocketAddr};
-use std::rc::Rc;
 use std::io::Result as IoResult;
 
 use super::msgqueue::*;
@@ -13,7 +12,7 @@ static MSG_PADDING: u16 = 32;
 
 /// The sending end of an unreliable message socket.
 pub struct Sender {
-    out_queue: VecDeque<(MsgChunk, Rc<AddrsContainer>)>,
+    out_queue: VecDeque<(MsgChunk, AddrsContainer)>,
     last_id: u64,
     socket: UdpSocket,
     pub datagram_length: u16,
@@ -27,13 +26,13 @@ pub struct Receiver {
     pub datagram_length: u16
 }
 
-#[derive(Debug)]
-struct AddrsContainer{
+#[derive(Debug, Clone)]
+pub struct AddrsContainer{
     v: Vec<SocketAddr>
 }
 
 impl AddrsContainer {
-    fn from_to_sock<T: ToSocketAddrs>(socket_addrs: T) -> IoResult<AddrsContainer> {
+    pub fn from_to_sock<T: ToSocketAddrs>(socket_addrs: T) -> IoResult<AddrsContainer> {
         let iter = try!(socket_addrs.to_socket_addrs());
         let vec = iter.collect();
         Ok(AddrsContainer{v: vec})
@@ -77,6 +76,11 @@ impl Receiver {
             }
         }
     }
+
+    /// Removes all stored incomplete messages from a specific address.
+    pub fn clear_addr(&mut self, addr: &SocketAddr) {
+        self.queue.remove(addr);
+    }
 }
 
 impl Sender {
@@ -100,7 +104,7 @@ impl Sender {
     pub fn enqueue<T: ToSocketAddrs>(&mut self, message: Vec<u8>, addrs: T) -> UnrResult<()> {
         self.last_id += 1;
         let id = self.last_id;
-        let addrs = Rc::new(try!(AddrsContainer::from_to_sock(addrs)));
+        let addrs = try!(AddrsContainer::from_to_sock(addrs));
         let num_chunks = message.len() / ((self.datagram_length - MSG_PADDING) as usize);
 
         for _ in 0 .. self.replication {
@@ -130,7 +134,7 @@ impl Sender {
         let bound = bincode::SizeLimit::Bounded(self.datagram_length as u64);
         if let Some((next, addrs)) = self.out_queue.pop_front() {
             let bytes = try!(bincode::encode(&next, bound));
-            try!(self.socket.send_to(&bytes[..], &*addrs));
+            try!(self.socket.send_to(&bytes[..], addrs));
         }
 
         Ok(!self.out_queue.is_empty())
@@ -140,5 +144,13 @@ impl Sender {
     pub fn send_all(&mut self) -> UnrResult<()> {
         while try!(self.send_one()) {}
         Ok(())
+    }
+
+    pub fn is_queue_empty(&self) -> bool {
+        self.out_queue.is_empty()
+    }
+
+    pub fn queue_len(&self) -> usize {
+        self.out_queue.len()
     }
 }
