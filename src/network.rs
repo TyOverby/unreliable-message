@@ -1,5 +1,5 @@
 use std::sync::mpsc;
-use std::collections::{VecDeque, HashMap};
+use std::collections::{VecDeque, HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::net::{UdpSocket, ToSocketAddrs, SocketAddr};
 use std::io::Result as IoResult;
@@ -19,17 +19,32 @@ pub struct Sender {
     pub replication: u8
 }
 
+pub enum ReceiverFilter {
+    Whitelist(HashSet<SocketAddr>),
+    Blacklist(HashSet<SocketAddr>)
+}
+
 /// The receiving end of an unreliable message socket.
 pub struct Receiver {
     socket: UdpSocket,
     queue: HashMap<SocketAddr, MsgQueue>,
     pub datagram_length: u16,
-    max_connection_size: Option<usize>
+    pub max_connection_size: Option<usize>,
+    pub filter: ReceiverFilter
 }
 
 #[derive(Debug, Clone)]
 pub struct AddrsContainer{
     v: Vec<SocketAddr>
+}
+
+impl ReceiverFilter {
+    fn allow_through(&self, addr: &SocketAddr) -> bool {
+        match self {
+            &ReceiverFilter::Whitelist(ref set) => set.contains(addr),
+            &ReceiverFilter::Blacklist(ref set) => !set.contains(addr)
+        }
+    }
 }
 
 impl AddrsContainer {
@@ -54,13 +69,13 @@ impl Receiver {
     ///
     /// `datagram_length` is the max-size of the UDP packet that you expect to
     /// receive.
-    pub fn from_socket(socket: UdpSocket, datagram_length: u16, max_connection_size: Option<usize>) -> Receiver {
+    pub fn from_socket(socket: UdpSocket, datagram_length: u16, max_connection_size: Option<usize>, filter: ReceiverFilter) -> Receiver {
         Receiver {
             socket: socket,
             datagram_length: datagram_length,
             queue: HashMap::new(),
-            max_connection_size: max_connection_size
-
+            max_connection_size: max_connection_size,
+            filter: filter,
         }
     }
 
@@ -70,6 +85,11 @@ impl Receiver {
         let mut buf: Vec<u8> = (0 .. self.datagram_length).map(|_| 0).collect();
         loop {
             let (amnt, from) = try!(self.socket.recv_from(&mut buf[..]));
+            // Filter the incoming connection through the whitelist or blacklist.
+            if !self.filter.allow_through(&from) {
+                continue;
+            }
+
             let data = &buf[0 .. amnt];
             let chunk: MsgChunk = try!(bincode::decode(data));
 
