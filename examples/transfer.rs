@@ -1,5 +1,6 @@
 #![feature(ip_addr)]
 extern crate unreliable_message;
+use unreliable_message::network::ReceiverFilter;
 
 use std::net::{UdpSocket, SocketAddr, IpAddr, Ipv4Addr};
 
@@ -45,7 +46,7 @@ fn main() {
 
     // receiving thread
     let h2 = thread::spawn(move || {
-        let mut receiver = Receiver::from_socket(udp_in, MSG_SIZE);
+        let mut receiver = Receiver::from_socket(udp_in, MSG_SIZE, None, ReceiverFilter::empty_blacklist());
         loop {
             match receiver.poll() {
                 Ok((_, CompleteMessage(_, v))) => {

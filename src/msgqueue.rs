@@ -108,8 +108,10 @@ impl MsgQueue {
             } else {
                 return None;
             }
+        // We got a new chunk that needs to be processed.
         } else {
-            self.stages.insert(chunk.0, MsgStage::new(chunk));
+            self.cur_size += chunk.2.len();
+            self.stages.insert(id, MsgStage::new(chunk));
             return None;
         }
     }
@@ -207,7 +209,7 @@ impl MsgStage {
 // Queue tests
 
 #[test] fn queue_single() {
-    let mut queue = MsgQueue::new();
+    let mut queue = MsgQueue::new(None);
     let c1 = MsgChunk(MsgId(1), PieceNum(1, 1), vec![0]);
 
     let res = queue.insert_chunk(c1.clone());
@@ -222,7 +224,7 @@ impl MsgStage {
 }
 
 #[test] fn queue_double() {
-    let mut queue = MsgQueue::new();
+    let mut queue = MsgQueue::new(None);
     let c1 = MsgChunk(MsgId(1), PieceNum(1, 2), vec![0]);
     let c2 = MsgChunk(MsgId(1), PieceNum(2, 2), vec![1]);
 
@@ -238,7 +240,7 @@ impl MsgStage {
 }
 
 #[test] fn out_of_order() {
-    let mut queue = MsgQueue::new();
+    let mut queue = MsgQueue::new(None);
     let c1 = MsgChunk(MsgId(1), PieceNum(1, 1), vec![0]);
     let c2 = MsgChunk(MsgId(2), PieceNum(1, 1), vec![1]);
 
@@ -254,21 +256,21 @@ impl MsgStage {
     let b1 = MsgChunk(MsgId(2), PieceNum(1, 2), vec![2]);
     let b2 = MsgChunk(MsgId(2), PieceNum(2, 2), vec![3]);
 
-    let mut queue = MsgQueue::new();
+    let mut queue = MsgQueue::new(None);
     assert!(queue.insert_chunk(a1.clone()).is_none());
     assert!(queue.insert_chunk(b1.clone()).is_none());
     assert!(queue.insert_chunk(a2.clone()).is_some());
     assert!(queue.insert_chunk(b2.clone()).is_some());
 
 
-    let mut queue = MsgQueue::new();
+    let mut queue = MsgQueue::new(None);
     assert!(queue.insert_chunk(a1.clone()).is_none());
     assert!(queue.insert_chunk(b1.clone()).is_none());
     assert!(queue.insert_chunk(b2.clone()).is_some());
     assert!(queue.insert_chunk(a2.clone()).is_none());
 
 
-    let mut queue = MsgQueue::new();
+    let mut queue = MsgQueue::new(None);
     assert!(queue.insert_chunk(b1.clone()).is_none());
     assert!(queue.insert_chunk(b2.clone()).is_some());
     assert!(queue.insert_chunk(a2.clone()).is_none());
