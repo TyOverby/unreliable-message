@@ -39,6 +39,10 @@ pub struct AddrsContainer{
 }
 
 impl ReceiverFilter {
+    pub fn empty_blacklist() -> ReceiverFilter {
+        ReceiverFilter::Blacklist(HashSet::new())
+    }
+
     fn allow_through(&self, addr: &SocketAddr) -> bool {
         match self {
             &ReceiverFilter::Whitelist(ref set) => set.contains(addr),
