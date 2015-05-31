@@ -1,6 +1,6 @@
 [package]
 name = "unreliable-message"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Ty Overby <ty@pre-alpha.com>"]
 license = "MIT"
 description = "An implementation of unreliable message sending over UDP"
@@ -12,3 +12,4 @@ name = "unreliable_message"
 [dependencies]
 bincode = "*"
 rustc-serialize = "*"
+vec_map = "0.0.1"

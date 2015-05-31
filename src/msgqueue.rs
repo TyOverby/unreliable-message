@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use vec_map::VecMap;
 
 #[derive(RustcEncodable, RustcDecodable, Clone, Copy)]
 #[derive(Hash, Ord, PartialOrd, Eq, PartialEq, Debug)]
@@ -20,7 +21,7 @@ struct MsgStage {
     this_id: MsgId,
     total_pieces: u16,
     // TODO: change this to VecMap when you can
-    pieces: HashMap<usize, MsgChunk>,
+    pieces: VecMap<MsgChunk>,
     size: usize
 }
 
@@ -127,7 +128,7 @@ impl MsgStage {
         let mut stage = MsgStage {
             this_id: starter.0,
             total_pieces: out_of,
-            pieces: HashMap::with_capacity(out_of as usize),
+            pieces: VecMap::with_capacity(out_of as usize),
             size: 0
         };
 
@@ -173,7 +174,7 @@ impl MsgStage {
     let comp_chunk = MsgChunk(MsgId(0), PieceNum(1, 1), vec![0]);
     let stage = MsgStage::new(comp_chunk);
     assert!(stage.is_ready());
-    assert!(stage.merge() == CompleteMessage(MsgId(0), vec![0]));
+    assert_eq!(stage.merge(), CompleteMessage(MsgId(0), vec![0]));
 }
 
 #[test] fn is_ready_single_incomplete() {
@@ -189,14 +190,14 @@ impl MsgStage {
     let mut stage = MsgStage::new(c1.clone());
     stage.add_chunk(c2.clone());
     assert!(stage.is_ready());
-    assert!(stage.merge() == CompleteMessage(MsgId(0), vec![0, 1]));
+    assert_eq!(stage.merge(), CompleteMessage(MsgId(0), vec![0, 1]));
 
     // Now in the opposite order
 
     let mut stage = MsgStage::new(c2.clone());
     stage.add_chunk(c1.clone());
     assert!(stage.is_ready());
-    assert!(stage.merge() == CompleteMessage(MsgId(0), vec![0, 1]));
+    assert_eq!(stage.merge(), CompleteMessage(MsgId(0), vec![0, 1]));
 }
 
 #[test] fn is_ready_double_same() {
@@ -216,8 +217,8 @@ impl MsgStage {
     let res = queue.insert_chunk(c1.clone());
 
     assert!(res.is_some());
-    assert!(res.unwrap() == CompleteMessage(MsgId(1), vec![0]));
-    assert!(queue.last_released == Some(MsgId(1)));
+    assert_eq!(res.unwrap(), CompleteMessage(MsgId(1), vec![0]));
+    assert_eq!(queue.last_released, Some(MsgId(1)));
 
     // try to requeue the message.  It shouldn't go through this time.
     let res = queue.insert_chunk(c1);
@@ -233,8 +234,8 @@ impl MsgStage {
     assert!(res.is_none());
     let res = queue.insert_chunk(c2.clone());
     assert!(res.is_some());
-    assert!(res.unwrap() == CompleteMessage(MsgId(1), vec![0, 1]));
-    assert!(queue.last_released == Some(MsgId(1)));
+    assert_eq!(res.unwrap(), CompleteMessage(MsgId(1), vec![0, 1]));
+    assert_eq!(queue.last_released, Some(MsgId(1)));
 
     assert!(queue.insert_chunk(c1).is_none());
     assert!(queue.insert_chunk(c2).is_none());
