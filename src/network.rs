@@ -1,11 +1,9 @@
-use std::sync::mpsc;
 use std::collections::{VecDeque, HashMap, HashSet};
-use std::collections::hash_map::Entry;
 use std::net::{UdpSocket, ToSocketAddrs, SocketAddr};
 use std::io::Result as IoResult;
 
 use super::msgqueue::*;
-use super::{UnrError, UnrResult};
+use super::UnrResult;
 use bincode;
 
 static MSG_PADDING: u16 = 32;
@@ -140,7 +138,7 @@ impl Sender {
             let mut chunk_count = 0;
             for chunk in message[..].chunks((self.datagram_length - MSG_PADDING) as usize) {
                 let mut v = Vec::new();
-                v.push_all(chunk);
+                v.extend(chunk.iter().cloned());
                 let chunk = MsgChunk(
                     MsgId(id), PieceNum(chunk_count + 1, (num_chunks + 1) as u16), v);
                 self.out_queue.push_back((chunk, addrs.clone()));

@@ -1,4 +1,4 @@
-use std::collections::{VecMap, HashMap};
+use std::collections::HashMap;
 
 #[derive(RustcEncodable, RustcDecodable, Clone, Copy)]
 #[derive(Hash, Ord, PartialOrd, Eq, PartialEq, Debug)]
@@ -19,7 +19,8 @@ pub struct CompleteMessage(pub MsgId, pub Vec<u8>);
 struct MsgStage {
     this_id: MsgId,
     total_pieces: u16,
-    pieces: VecMap<MsgChunk>,
+    // TODO: change this to VecMap when you can
+    pieces: HashMap<usize, MsgChunk>,
     size: usize
 }
 
@@ -101,7 +102,7 @@ impl MsgQueue {
             };
 
             if ready {
-                let mut stage = self.stages.remove(&id).unwrap();
+                let stage = self.stages.remove(&id).unwrap();
                 self.cur_size -= stage.size;
                 self.mark_published(id);
                 return Some(stage.merge());
@@ -126,7 +127,7 @@ impl MsgStage {
         let mut stage = MsgStage {
             this_id: starter.0,
             total_pieces: out_of,
-            pieces: VecMap::with_capacity(out_of as usize),
+            pieces: HashMap::with_capacity(out_of as usize),
             size: 0
         };
 
@@ -158,7 +159,7 @@ impl MsgStage {
         let mut v = Vec::with_capacity(size);
 
         for (_, &mut MsgChunk(_, _, ref mut bytes)) in self.pieces.iter_mut() {
-            v.append(bytes);
+            v.extend(bytes.iter().cloned());
         }
 
         CompleteMessage(self.this_id, v)
