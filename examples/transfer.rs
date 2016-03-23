@@ -1,10 +1,10 @@
 extern crate unreliable_message;
 use unreliable_message::network::ReceiverFilter;
 
-use std::net::{UdpSocket, SocketAddr, IpAddr, Ipv4Addr};
+use std::net::UdpSocket;
 
 fn get_sockets() -> (String, String) {
-    let localhost = "127.0.0.1";
+    const LOCALHOST: &'static str = "127.0.0.1";
     let mut args = std::env::args();
     args.next(); // drop how.
     let port_1: u16 = args.next().expect("Expected port number")
@@ -12,7 +12,7 @@ fn get_sockets() -> (String, String) {
     let port_2: u16 = args.next().expect("Expected port number")
                    .parse().ok().expect("Expected port number to be a number");
 
-    (format!("{}:{}", "127.0.0.1", port_1), format!("{}:{}", "127.0.0.1", port_2))
+    (format!("{}:{}", LOCALHOST, port_1), format!("{}:{}", LOCALHOST, port_2))
 }
 
 const MSG_SIZE:u16 = 50;

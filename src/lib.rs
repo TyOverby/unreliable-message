@@ -3,7 +3,7 @@ extern crate rustc_serialize;
 extern crate vec_map;
 
 use std::io::Error as IoError;
-use bincode::{EncodingError, DecodingError};
+use bincode::rustc_serialize::{EncodingError, DecodingError};
 pub use network::{Sender, Receiver};
 
 pub mod msgqueue;

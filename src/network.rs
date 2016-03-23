@@ -93,7 +93,7 @@ impl Receiver {
             }
 
             let data = &buf[0 .. amnt];
-            let chunk: MsgChunk = try!(bincode::decode(data));
+            let chunk: MsgChunk = try!(bincode::rustc_serialize::decode(data));
 
             let max_size = self.max_connection_size.clone();
             let q = self.queue.entry(from.clone())
@@ -160,7 +160,7 @@ impl Sender {
     pub fn send_one(&mut self) -> UnrResult<bool> {
         let bound = bincode::SizeLimit::Bounded(self.datagram_length as u64);
         if let Some((next, addrs)) = self.out_queue.pop_front() {
-            let bytes = try!(bincode::encode(&next, bound));
+            let bytes = try!(bincode::rustc_serialize::encode(&next, bound));
             try!(self.socket.send_to(&bytes[..], addrs));
         }
 
